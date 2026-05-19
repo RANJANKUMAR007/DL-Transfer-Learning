@@ -4,18 +4,16 @@
 To develop an image classification model using transfer learning with VGG19 architecture for the given dataset.
 
 ## Problem Statement and Dataset
-Transfer Learning is a technique where a pre-trained model (trained on a large dataset such as ImageNet) is used as a starting point for a different but related task. It leverages learned features from the original task to improve learning efficiency and performance on the new task.
-
-VGG19 is a convolutional neural network with 19 layers. It consists of multiple convolutional layers for feature extraction, followed by fully connected layers for classification. In transfer learning, we typically freeze the convolutional layers and retrain the final fully connected layers to match our dataset.
-
+The problem statement for this experiment is to develop an image classification model that can accurately distinguish between 'defect' and 'notdefect' semiconductor chip images. This is a binary classification task, where the goal is to leverage transfer learning using a pre-trained VGG19 model to effectively classify new, unseen chip images.
 
 ## Neural Network Model
-<img width="987" height="792" alt="4" src="https://github.com/user-attachments/assets/107c8df2-3610-4b5f-ace5-8369cd1e682e" />
+
+<img width="1043" height="802" alt="592394652-2f989398-134b-4cef-8fb1-6efb6aed0055" src="https://github.com/user-attachments/assets/c67d64fe-6d90-46b2-84b2-84a9bf1d77e0" />
 
 
 ## DESIGN STEPS
-### STEP 1: 
 
+### STEP 1: 
 Import required libraries and define image transforms.
 
 ### STEP 2: 
@@ -23,8 +21,8 @@ Import required libraries and define image transforms.
 Load training and testing datasets using ImageFolder.
 
 ### STEP 3: 
-Visualize sample images from the dataset.
 
+Visualize sample images from the dataset.
 
 ### STEP 4: 
 
@@ -40,7 +38,6 @@ Evaluate the model with test accuracy, confusion matrix, classification report, 
 
 
 
-
 ## PROGRAM
 
 ### Name: RANJAN KUMAR G
@@ -48,86 +45,144 @@ Evaluate the model with test accuracy, confusion matrix, classification report, 
 ### Register Number: 212223240138
 
 ```
-def train_model(model, train_loader, test_loader, epochs=10):
-    model.train() # Set model to training mode
-    for epoch in range(epochs):
-        running_loss = 0.0
-        correct_predictions = 0
-        total_samples = 0
-        for inputs, labels in train_loader:
-            inputs = inputs.to(device)
-            labels = labels.float().unsqueeze(1).to(device) # Ensure labels are float and have shape (batch_size, 1)
+from google.colab import drive
+drive.mount('/content/drive')
 
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+from torchvision import models, datasets
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
 
-            running_loss += loss.item() * inputs.size(0)
+## Step 1: Load and Preprocess Data
+# Define transformations for images
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),  # Resize images for pre-trained model input
+    transforms.ToTensor(),
+    #transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # Standard normalization for pre-trained models
+])
 
-            # Calculate training accuracy
-            predicted = (torch.sigmoid(outputs) > 0.5).int()
-            correct_predictions += (predicted == labels.int()).sum().item()
-            total_samples += labels.size(0)
+!unzip -qq /content/drive/MyDrive/deeplearningexperiments/chip_data.zip -d data
 
-        epoch_loss = running_loss / total_samples
-        epoch_acc = correct_predictions / total_samples
-        print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}')
+from torchvision import datasets
+import torchvision.transforms as transforms
 
-    print("Training finished.")
+# Define transformations for images (moved from oymch2pTUreT)
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),  # Resize images for pre-trained model input
+    transforms.ToTensor(),
+    #transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # Standard normalization for pre-trained models
+])
 
-# Train the model
-train_model(model, train_loader, test_loader)
-print(f"Total number of test samples: {len(test_dataset)}")
+# Load dataset from a folder (structured as: dataset/class_name/images)
+dataset_path = "./data/dataset/"
+train_dataset = datasets.ImageFolder(root=f"{dataset_path}/train", transform=transform)
+test_dataset = datasets.ImageFolder(root=f"{dataset_path}/test", transform=transform)
+
+# Display some input images
+def show_sample_images(dataset, num_images=5):
+    fig, axes = plt.subplots(1, num_images, figsize=(5, 5))
+    for i in range(num_images):
+        image, label = dataset[i]
+        image = image.permute(1, 2, 0)  # Convert tensor format (C, H, W) to (H, W, C)
+        axes[i].imshow(image)
+        axes[i].set_title(dataset.classes[label])
+        axes[i].axis("off")
+    plt.show()
+
+
+# Show sample images from the training dataset
+show_sample_images(train_dataset)
+
+# Get the total number of samples in the training dataset
+print(f"Total number of training samples: {len(train_dataset)}")
+
+# Get the shape of the first image in the dataset
+first_image, label = train_dataset[0]
+print(f"Shape of the first image: {first_image.shape}")
+
+# Get the total number of samples in the testing dataset
+print(f'Total number of test samples: {len(test_dataset)}')
+
+
+# Get the shape of the first image in the dataset
 first_image1,label=test_dataset[0]
-print("Image shape:",first_image1.shape)
+print(f"Shape of the first image: {first_image1.shape}")
 
-model=models.vgg19(weights=VGG19_Weights.DEFAULT)
+# Create DataLoader for batch processing
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+## Step 2: Load Pretrained Model and Modify for Transfer Learning
+# Load a pre-trained VGG19 model
+model=models.vgg19(weights=models.VGG19_Weights.DEFAULT)
+
+
+# Move model to GPU if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+
+from torchsummary import summary
+# Print model summary
+summary(model, input_size=(3, 224, 224))
+
+# Modify the final fully connected layer to match the dataset classes
 model.classifier[-1]=nn.Linear(model.classifier[-1].in_features,1)
+
+# Move model to GPU if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+
+
+# Freeze all layers except the final layer
+for param in model.features.parameters():
+    param.requires_grad = False  # Freeze feature extractor layers
+
+# Include the Loss function and optimizer
 criterion = nn.BCEWithLogitsLoss()
 optimizer = optim.Adam(model.parameters(),lr=0.001)
 
-# Train the model
+## Step 3: Train the Model
 def train_model(model, train_loader,test_loader,num_epochs=10):
     train_losses=[]
     val_losses=[]
-    model.train()
+    model.train() 
     for epoch in range(num_epochs):
-        running_loss=0.0
-        for images,labels in train_loader:
-            images = images.to(device)
-            labels = labels.to(device) 
-            optimizer.zero_grad()
-            outputs=model(images)
+      running_loss=0.0
+      for images, labels in train_loader: 
+        images,labels=images.to(device),labels.to(device)
+        optimizer.zero_grad()
+        outputs=model(images) 
+        loss=criterion(outputs,labels.unsqueeze(1).float()) 
+        loss.backward() 
+        optimizer.step()
+        running_loss+=loss.item()
+      train_losses.append(running_loss/len(train_loader)) 
 
-            target_labels = labels.unsqueeze(1).float().to(device)
-            loss=criterion(outputs,target_labels)
+      # Compute validation loss
+      model.eval()
+      val_loss=0.0
+      with torch.no_grad():
+        for images,labels in test_loader: 
+          images,labels=images.to(device),labels.to(device)
+          outputs=model(images) 
+          loss=criterion(outputs,labels.unsqueeze(1).float())
+          val_loss+=loss.item()
+      val_losses.append(val_loss/len(test_loader))
+      model.train()
 
-            loss.backward()
-            optimizer.step()
-            running_loss+=loss.item()
-        train_losses.append(running_loss/len(train_loader))
+      
+      print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_losses[-1]:.4f}, Validation Loss: {val_losses[-1]:.4f}')
 
-        
-        model.eval()
-        val_loss=0.0
-        with torch.no_grad():
-          for images,labels in test_loader:
-            images = images.to(device)
-            labels = labels.to(device)
-            outputs=model(images)
-            target_labels = labels.unsqueeze(1).float().to(device)
-            loss=criterion(outputs,target_labels)
-            val_loss+=loss.item()
-        val_losses.append(val_loss/len(test_loader))
-        model.train()
-
-        print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_losses[-1]:.4f}, Validation Loss: {val_losses[-1]:.4f}')
-
-    # Plot training and validation loss
-    print("Name: RANJAN KUMAR G")
-    print("Register Number:  212223240138")
+    # Plot training and validation loss 
+    print("Name:RANJAN KUMAR G")
+    print("Register Number: 212223240138")
     plt.figure(figsize=(8, 6))
     plt.plot(range(1, num_epochs + 1), train_losses, label='Train Loss', marker='o')
     plt.plot(range(1, num_epochs + 1), val_losses, label='Validation Loss', marker='s')
@@ -137,22 +192,98 @@ def train_model(model, train_loader,test_loader,num_epochs=10):
     plt.legend()
     plt.show()
 
+
+# Move model to GPU if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+
+# Train the model
+train_model(model,train_loader,test_loader)
+
+## Step 4: Test the Model and Compute Confusion Matrix & Classification Report
+def test_model(model, test_loader):
+    model.eval()
+    correct = 0
+    total = 0
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            probs=torch.sigmoid(outputs)
+            predicted=(probs>0.5).int()
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+            all_preds.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy().astype(int))
+
+    accuracy = correct / total
+    print(f'Test Accuracy: {accuracy:.4f}')
+
+    # Compute confusion matrix
+    cm = confusion_matrix(all_labels, all_preds)
+    print("Name:RANJAN KUMAR G")
+    print("Register Number: 212223240138")
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=train_dataset.classes, yticklabels=train_dataset.classes)
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix')
+    plt.show()
+
+    # Print classification report
+    print("Name:RANJAN KUMAR G")
+    print("Register Number: 212223240138")
+    print("Classification Report:")
+    print(classification_report(all_labels, all_preds, target_names=train_dataset.classes))
+
+test_model(model,test_loader)
+
+## Step 5: Predict on a Single Image and Display It
+def predict_image(model, image_index, dataset):
+    model.eval()
+    image, label = dataset[image_index]
+    with torch.no_grad():
+        image_tensor = image.unsqueeze(0).to(device)
+        output = model(image_tensor)
+
+        # Apply sigmoid to get probability, threshold at 0.5
+        prob = torch.sigmoid(output)
+        predicted = (prob > 0.5).int().item()
+
+
+    class_names = class_names = dataset.classes
+    # Display the image
+    image_to_display = transforms.ToPILImage()(image)
+    plt.figure(figsize=(4, 4))
+    plt.imshow(image_to_display)
+    plt.title(f'Actual: {class_names[label]}\nPredicted: {class_names[predicted]}')
+    plt.axis("off")
+    plt.show()
+
+    print(f'Actual: {class_names[label]}, Predicted: {class_names[predicted]}')
+
+# Example Prediction
+predict_image(model, image_index=55, dataset=test_dataset)
+predict_image(model,image_index=25,dataset=test_dataset)
+
+
 ```
-
 ### OUTPUT
-
 ## Training Loss, Validation Loss Vs Iteration Plot
-
-
+<img width="933" height="477" alt="image" src="https://github.com/user-attachments/assets/b339ca1a-a5a1-48fd-9ddc-63b9bd3eb583" />
+<img width="847" height="670" alt="image" src="https://github.com/user-attachments/assets/84c56b97-26c9-4b2c-89c8-ebcd9815dd88" />
 ## Confusion Matrix
-
-
-
+<img width="891" height="746" alt="image" src="https://github.com/user-attachments/assets/b8354d0d-d3fc-4968-a4b8-905caef317c0" />
 ## Classification Report
-
+<img width="667" height="307" alt="image" src="https://github.com/user-attachments/assets/8b9a3e12-3b35-4457-b578-5a1c75d76294" />
 ### New Sample Data Prediction
+<img width="593" height="532" alt="image" src="https://github.com/user-attachments/assets/ae81773f-43c0-4ae1-a863-5d283c8b9e07" />
+<img width="480" height="495" alt="image" src="https://github.com/user-attachments/assets/bca94a3a-668d-4a96-83a3-3e72771fc218" />
 
 
 
 ## RESULT
-The image classification model using transfer learning with VGG19 architecture for the given dataset has been executed successfully.
+Thus the python program to develop an image classification model using transfer learning with VGG19 architecture is executed successfully.
